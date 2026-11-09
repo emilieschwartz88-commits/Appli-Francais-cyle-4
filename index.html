@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mine – aide en français</title>
+<style>
+:root{--paper:#FBFCFF;--line:#CFDBF2;--margin:#E0556B;--ink:#1F3A8A;--text:#1B2340;--soft:#5B6584;--card:#fff;--hl:#FFE45E;--border:#C3CFE8;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--paper:#141B33;--line:#222D52;--margin:#F0788B;--ink:#9DB7FF;--text:#E8ECFA;--soft:#A2ABC8;--card:#1B2442;--hl:#E8C93A;--border:#34406B}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background-color:var(--paper);line-height:1.5;
+ background-image:linear-gradient(to right,transparent 39px,var(--margin) 39px,var(--margin) 41px,transparent 41px),repeating-linear-gradient(to bottom,transparent 0,transparent 31px,var(--line) 31px,var(--line) 32px)}
+.wrap{max-width:720px;margin:0 auto;padding:18px 14px 60px 54px}
+h1{font-size:1.7rem;margin:0 0 4px;color:var(--ink)}
+p{margin:0 0 10px}
+.card{background:var(--card);border:2px solid var(--border);border-radius:14px;padding:14px;margin:12px 0}
+label{font-weight:700;display:block;margin-bottom:4px}
+textarea,input{width:100%;font:inherit;color:var(--text);background:var(--card);border:2px solid var(--border);border-radius:10px;padding:10px}
+textarea{min-height:110px}
+.lv{display:inline-flex;border:2px solid var(--ink);border-radius:99px;overflow:hidden;margin-bottom:10px}
+.lv button{border:0;background:transparent;color:var(--ink);font:inherit;font-weight:700;padding:6px 16px;cursor:pointer}
+.lv button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.btn{border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer;margin:6px 6px 0 0}
+.btn.main{background:var(--ink);color:var(--paper)}
+.btn:disabled{opacity:.5;cursor:wait}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--margin);outline-offset:2px}
+.msg{border-radius:12px;padding:10px 14px;margin:10px 0;white-space:pre-wrap}
+.msg.ia{background:var(--card);border:2px solid var(--border)}
+.msg.ia b{display:block;color:var(--ink);margin-bottom:2px}
+.msg.moi{background:var(--hl);color:#1B2340;margin-left:20%}
+.err{color:var(--margin);font-weight:700}
+.note{font-size:.9rem;color:var(--soft);border-left:4px solid var(--margin);padding-left:10px;margin-top:20px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mine, ton aide en français</h1>
+  <p>Recopie ton exercice. Je t’aide à trouver, mais c’est toi qui écris la réponse.</p>
+
+  <div class="card" id="saisie">
+    <div class="lv" role="group" aria-label="Niveau"><button id="n4" aria-pressed="true">4ème</button><button id="n3" aria-pressed="false">3ème</button></div>
+    <label for="ex">Ton exercice (consigne et texte)</label>
+    <textarea id="ex" placeholder="Exemple : Relève les propositions subordonnées dans la phrase : « Je sais que tu viendras quand tu auras fini. »"></textarea>
+    <label for="code" style="margin-top:10px">Code de classe</label>
+    <input id="code" type="password" autocomplete="off" placeholder="Donné par ton professeur">
+    <button class="btn main" id="go">Demander de l’aide</button>
+  </div>
+
+  <div id="chat" hidden>
+    <div id="fil" aria-live="polite"></div>
+    <button class="btn" id="suite">J’ai essayé, je veux une aide de plus</button>
+    <div class="card">
+      <label for="rep">Ma réponse</label>
+      <textarea id="rep" placeholder="Écris ici ta réponse…"></textarea>
+      <button class="btn main" id="verif">Vérifier ma réponse</button>
+    </div>
+    <button class="btn" id="neuf">Nouvel exercice</button>
+  </div>
+  <p class="note">Mine est une intelligence artificielle : elle peut se tromper. En cas de doute, vérifie dans ton cours ou demande à ton professeur. N’écris jamais ton nom ni d’informations personnelles.</p>
+</div>
+
+<script>
+var niveau="4ème",msgs=[],palier=0,busy=false;
+var NOMS=["","reformuler la consigne","faire un rappel de cours","poser une question-guide","donner un exemple semblable"];
+var $=function(i){return document.getElementById(i)};
+function lvl(n){niveau=n;$("n4").setAttribute("aria-pressed",n==="4ème");$("n3").setAttribute("aria-pressed",n==="3ème")}
+$("n4").onclick=function(){lvl("4ème")};$("n3").onclick=function(){lvl("3ème")};
+function bulle(cls,titre,texte){var d=document.createElement("div");d.className="msg "+cls;
+  if(titre){var b=document.createElement("b");b.textContent=titre;d.appendChild(b)}
+  d.appendChild(document.createTextNode(texte));$("fil").appendChild(d);d.scrollIntoView({block:"nearest"});return d}
+function occupe(v){busy=v;["go","suite","verif"].forEach(function(i){$(i).disabled=v})}
+async function envoyer(texte,affiche,titre){
+  if(busy)return;occupe(true);
+  msgs.push({role:"user",content:texte});
+  if(affiche)bulle("moi","",affiche);
+  var attente=bulle("ia","","Mine réfléchit…");
+  try{
+    var r=await fetch("/api/aide",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({code:$("code").value,niveau:niveau,messages:msgs})});
+    var d=await r.json();
+    if(!r.ok)throw new Error(d.erreur||"Erreur");
+    msgs.push({role:"assistant",content:d.texte});
+    attente.remove();bulle("ia",titre,d.texte);
+  }catch(e){
+    msgs.pop();attente.className="msg ia err";attente.textContent=e.message||"Une erreur est survenue.";
+  }
+  $("suite").hidden=palier>=4;occupe(false);
+}
+$("go").onclick=function(){
+  var ex=$("ex").value.trim();if(!ex){$("ex").focus();return}
+  msgs=[];palier=1;$("fil").innerHTML="";$("saisie").hidden=true;$("chat").hidden=false;
+  bulle("moi","","Mon exercice ("+niveau+") :\n"+ex);
+  envoyer("EXERCICE DE L’ÉLÈVE :\n"+ex+"\n\nDemande : palier 1, "+NOMS[1]+".","","Palier 1 – Consigne");
+};
+$("suite").onclick=function(){
+  if(palier>=4)return;palier++;
+  envoyer("L’élève a essayé et demande le palier "+palier+" : "+NOMS[palier]+".","J’ai essayé. Aide suivante, s’il te plaît.","Palier "+palier);
+};
+$("verif").onclick=function(){
+  var r=$("rep").value.trim();if(!r){$("rep").focus();return}
+  var t=r;$("rep").value="";
+  envoyer("RÉPONSE DE L’ÉLÈVE À VÉRIFIER :\n"+t,"Ma réponse :\n"+t,"Vérification");
+};
+$("neuf").onclick=function(){msgs=[];palier=0;$("fil").innerHTML="";$("ex").value="";$("rep").value="";$("chat").hidden=true;$("saisie").hidden=false;$("ex").focus()};
+</script>
+</body>
+</html>
